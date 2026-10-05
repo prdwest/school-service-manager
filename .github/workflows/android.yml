@@ -17,23 +17,18 @@ jobs:
           gradle-version: '8.10.2'
       - name: Build release APK
         run: gradle assembleRelease --no-daemon
-      - name: Create signing key
+      - name: Prepare stable signing key
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
         run: |
-          keytool -genkeypair -v \
-            -keystore release-keystore.jks \
-            -storepass android \
-            -keypass android \
-            -alias schoolservice \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=School Service Manager, O=PRDWEST"
+          test -n "$RELEASE_KEYSTORE_B64" || (echo "Missing GitHub Actions secret RELEASE_KEYSTORE_B64" && exit 1)
+          echo "$RELEASE_KEYSTORE_B64" | base64 --decode > release-keystore.jks
       - name: Sign release APK
         run: |
           $ANDROID_HOME/build-tools/35.0.0/apksigner sign \
             --ks release-keystore.jks \
-            --ks-pass pass:android \
-            --key-pass pass:android \
+            --ks-pass pass:${{ secrets.RELEASE_KEYSTORE_PASSWORD }} \
+            --key-pass pass:${{ secrets.RELEASE_KEY_PASSWORD }} \
             --out app/build/outputs/apk/release/school-service-manager-release.apk \
             app/build/outputs/apk/release/app-release-unsigned.apk
       - name: Verify signed APK
