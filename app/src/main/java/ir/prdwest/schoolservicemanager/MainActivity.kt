@@ -1,5 +1,6 @@
 package ir.prdwest.schoolservicemanager
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.content.Intent
 import android.view.View
