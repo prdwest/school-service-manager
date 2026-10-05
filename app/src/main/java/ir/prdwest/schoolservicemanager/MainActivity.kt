@@ -249,7 +249,7 @@ class MainActivity : Activity() {
     private fun studentRow(n: Int, s: Student, ay: String, pairs: List<Pair<Int, Int>>): View {
         val r = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            background = if (n % 2 == 0) Color.rgb(249, 251, 254) else Color.WHITE
+            setBackgroundColor(if (n % 2 == 0) Color.rgb(249, 251, 254) else Color.WHITE)
         }
         cellLight(r, n.toString(), 55)
         cellLight(r, s.name, 145, true)
