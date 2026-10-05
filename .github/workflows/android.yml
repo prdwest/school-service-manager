@@ -45,3 +45,4 @@ jobs:
           name: school-service-manager-release-installable
           path: app/build/outputs/apk/release/school-service-manager-release.apk
           if-no-files-found: error
+
