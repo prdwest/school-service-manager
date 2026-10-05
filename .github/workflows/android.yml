@@ -16,7 +16,10 @@ jobs:
         with:
           gradle-version: '8.10.2'
       - run: gradle assembleRelease --no-daemon
+      - name: List generated APK
+        run: find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print
       - uses: actions/upload-artifact@v4
         with:
           name: school-service-manager-release
-          path: app/build/outputs/apk/release/app-release.apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
