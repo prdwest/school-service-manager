@@ -61,7 +61,7 @@ class MainActivity : Activity() {
 
     private fun base(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        background = bgColor
+        setBackgroundColor(bgColor)
         layoutDirection = View.LAYOUT_DIRECTION_RTL
     }
 
