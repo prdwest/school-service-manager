@@ -1,4 +1,4 @@
-name: Android Installable APK
+name: Android Installable Release APK
 on:
   push:
     branches: [main]
@@ -15,13 +15,33 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - run: gradle assembleDebug --no-daemon
-      - name: Verify APK
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon
+      - name: Create signing key
         run: |
-          test -f app/build/outputs/apk/debug/app-debug.apk
-          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          keytool -genkeypair -v \
+            -keystore release-keystore.jks \
+            -storepass android \
+            -keypass android \
+            -alias schoolservice \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=School Service Manager, O=PRDWEST"
+      - name: Sign release APK
+        run: |
+          $ANDROID_HOME/build-tools/35.0.0/apksigner sign \
+            --ks release-keystore.jks \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out app/build/outputs/apk/release/school-service-manager-release.apk \
+            app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Verify signed APK
+        run: |
+          test -f app/build/outputs/apk/release/school-service-manager-release.apk
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/school-service-manager-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: school-service-manager-installable
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: school-service-manager-release-installable
+          path: app/build/outputs/apk/release/school-service-manager-release.apk
           if-no-files-found: error
