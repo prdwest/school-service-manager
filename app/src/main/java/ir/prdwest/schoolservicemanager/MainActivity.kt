@@ -17,6 +17,7 @@ class MainActivity : Activity() {
     private lateinit var db: DatabaseHelper
     private lateinit var root: LinearLayout
     private var startYear = 0
+    private var selectedMonth = PersianCalendar.today().m
     private val months = PersianCalendar.months
     private val blue = Color.rgb(20, 108, 205)
     private val blue2 = Color.rgb(35, 135, 225)
@@ -109,22 +110,22 @@ class MainActivity : Activity() {
         val c = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val filters = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         filters.addView(spinnerBox("سال تحصیلی", startYear.toString() + "-" + (startYear + 1)), LinearLayout.LayoutParams(0, dp(70), 1f).apply { setMargins(0, 0, dp(5), 0) })
-        val nowMonth = months[(PersianCalendar.today().m - 1).coerceIn(0, 11)]
+        val nowMonth = months[(selectedMonth - 1).coerceIn(0, 11)]
         filters.addView(spinnerBox("ماه", nowMonth), LinearLayout.LayoutParams(0, dp(70), 1f).apply { setMargins(dp(5), 0, 0, 0) })
         c.addView(filters)
 
         val stats = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val st = db.students()
         val ay = academicYear()
-        val pairs = PersianCalendar.academicMonths(startYear)
+        val selectedPair = PersianCalendar.academicMonths(startYear)[(selectedMonth - 1).coerceIn(0, 11)]
         var paid = 0
         var received = 0L
-        st.forEach { s -> pairs.forEach { p -> if (db.payment(s.id, ay, p.first, p.second)?.paid == true) { paid++; received += s.fee } } }
-        val total = st.size * 12
-        statCard(stats, "✓", "پرداخت شده", paid.toString(), green)
-        statCard(stats, "+", "پرداخت نشده", (total - paid).coerceAtLeast(0).toString(), red)
+        st.forEach { s -> if (db.payment(s.id, ay, selectedPair.first, selectedPair.second)?.paid == true) { paid++; received += s.fee } }
+        val total = st.size
+        statCard(stats, "✓", "پرداخت شده", paid.toString() + " نفر", green)
+        statCard(stats, "+", "پرداخت نشده", (total - paid).coerceAtLeast(0).toString() + " نفر", red)
         statCard(stats, "₿", "دریافت شده", money(received), teal, "تومان")
-        statCard(stats, "▣", "مانده", money((st.sumOf { it.fee } * 12 - received).coerceAtLeast(0)), purple, "تومان")
+        statCard(stats, "▣", "مانده", money((st.sumOf { it.fee } - received).coerceAtLeast(0)), purple, "تومان")
         c.addView(stats, LinearLayout.LayoutParams(-1, dp(112)).apply { setMargins(0, dp(10), 0, 0) })
 
         val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -155,7 +156,8 @@ class MainActivity : Activity() {
             background = shape(Color.WHITE, 12, line)
             setPadding(dp(6), dp(4), dp(6), dp(4))
             addView(text(title, 11f, Color.DKGRAY, true))
-            addView(text(value + "  •  غیرفعال", 13f, navy, true))
+            addView(text(value + "  ⌄", 13f, navy, true))
+            setOnClickListener { if (title == "ماه") { AlertDialog.Builder(this@MainActivity).setTitle("انتخاب ماه").setSingleChoiceItems(months, selectedMonth - 1) { d, which -> selectedMonth = which + 1; d.dismiss(); showDashboard() }.setNegativeButton("انصراف", null).show() } else { val current = PersianCalendar.today(); val currentStart = if (current.m <= 6) current.y - 1 else current.y; val years = (currentStart - 5..currentStart + 1).map { y -> y.toString() + "-" + (y + 1) }.toTypedArray(); val selected = (startYear - (currentStart - 5)).coerceIn(0, years.lastIndex); AlertDialog.Builder(this@MainActivity).setTitle("انتخاب سال تحصیلی").setSingleChoiceItems(years, selected) { d, which -> startYear = currentStart - 5 + which; d.dismiss(); showDashboard() }.setNegativeButton("انصراف", null).show() } }
         }
     }
 
