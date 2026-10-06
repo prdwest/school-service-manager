@@ -310,17 +310,41 @@ class MainActivity : Activity() {
         form.addView(name, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(3), 0, dp(8)) })
         form.addView(text("مبلغ ماهانه (تومان) *", 13f, navy, true))
         form.addView(fee, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(3), 0, dp(8)) })
-        AlertDialog.Builder(this)
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("افزودن دانش‌آموز")
             .setView(form)
-            .setPositiveButton("ذخیره") { _, _ ->
-                if (name.text.isNotBlank()) {
-                    db.addStudent(name.text.toString().trim(), fee.text.toString().replace(",", "").toLongOrNull() ?: 0L)
-                    autoBackup()
-                    showDashboard()
-                }
+            .setPositiveButton("ثبت و افزودن نفر بعدی", null)
+            .setNeutralButton("ثبت و بستن", null)
+            .setNegativeButton("انصراف", null)
+            .create()
+
+        fun saveStudent(closeAfter: Boolean) {
+            val studentName = name.text.toString().trim()
+            if (studentName.isBlank()) {
+                name.error = "نام دانش‌آموز را وارد کنید"
+                name.requestFocus()
+                return
             }
-            .setNegativeButton("انصراف", null).show()
+            db.addStudent(studentName, fee.text.toString().replace(",", "").toLongOrNull() ?: 0L)
+            autoBackup()
+            Toast.makeText(this, "دانش‌آموز ثبت شد", Toast.LENGTH_SHORT).show()
+            if (closeAfter) {
+                dialog.dismiss()
+                showDashboard()
+            } else {
+                name.text.clear()
+                fee.text.clear()
+                name.requestFocus()
+            }
+        }
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { saveStudent(false) }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { saveStudent(true) }
+            name.requestFocus()
+        }
+        dialog.show()
     }
 
     private fun details(s: Student) {
