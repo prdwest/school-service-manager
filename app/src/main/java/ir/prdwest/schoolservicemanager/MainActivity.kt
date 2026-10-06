@@ -18,6 +18,7 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private var startYear = 0
     private var selectedMonth = PersianCalendar.today().m
+    private var currentScreen: (() -> Unit)? = null
     private val months = PersianCalendar.months
     private val blue = Color.rgb(20, 108, 205)
     private val blue2 = Color.rgb(35, 135, 225)
@@ -94,6 +95,7 @@ class MainActivity : Activity() {
     }
 
     private fun showDashboard() {
+        currentScreen = { showDashboard() }
         val r = base()
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -164,7 +166,7 @@ class MainActivity : Activity() {
                         .setSingleChoiceItems(months.toTypedArray(), selectedMonth - 1) { dialog, which: Int ->
                             selectedMonth = which + 1
                             dialog.dismiss()
-                            showDashboard()
+                            (currentScreen ?: { showDashboard() }).invoke()
                         }
                         .setNegativeButton("انصراف", null)
                         .show()
@@ -180,7 +182,7 @@ class MainActivity : Activity() {
                         .setSingleChoiceItems(years, selected) { dialog, which: Int ->
                             startYear = currentStart - 5 + which
                             dialog.dismiss()
-                            showDashboard()
+                            (currentScreen ?: { showDashboard() }).invoke()
                         }
                         .setNegativeButton("انصراف", null)
                         .show()
@@ -220,6 +222,7 @@ class MainActivity : Activity() {
     }
 
     private fun showStudents() {
+        currentScreen = { showStudents() }
         val r = base()
         r.addView(header("دانش‌آموزان"))
         val scroll = body()
@@ -227,7 +230,7 @@ class MainActivity : Activity() {
 
         val filters = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         filters.addView(spinnerBox("سال تحصیلی", startYear.toString() + "-" + (startYear + 1)), LinearLayout.LayoutParams(0, dp(68), 1f).apply { setMargins(0, 0, dp(4), 0) })
-        filters.addView(spinnerBox("ماه", months[(PersianCalendar.today().m - 1).coerceIn(0, 11)]), LinearLayout.LayoutParams(0, dp(68), 1f).apply { setMargins(dp(4), 0, 0, 0) })
+        filters.addView(spinnerBox("ماه", months[(selectedMonth - 1).coerceIn(0, 11)]), LinearLayout.LayoutParams(0, dp(68), 1f).apply { setMargins(dp(4), 0, 0, 0) })
         c.addView(filters)
 
         c.addView(text("＋  افزودن دانش‌آموز", 15f, Color.WHITE, true).apply {
@@ -241,7 +244,7 @@ class MainActivity : Activity() {
             background = shape(Color.WHITE, 14, line)
             setPadding(dp(6), dp(6), dp(6), dp(6))
         }
-        card.addView(text("جدول دانش‌آموزان", 17f, navy, true))
+        card.addView(text("دانش‌آموزان", 17f, navy, true))
         val table = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         table.addView(tableHeader())
         val ay = academicYear()
@@ -249,10 +252,12 @@ class MainActivity : Activity() {
         val students = db.students()
         students.forEachIndexed { i, s -> table.addView(studentRow(i + 1, s, ay, pairs)) }
         if (students.isEmpty()) table.addView(text("دانش‌آموزی ثبت نشده است.", 15f, Color.DKGRAY).apply { gravity = Gravity.CENTER })
+        // ارتفاع ثابت حذف شد تا حداقل ۶۰ دانش‌آموز بدون برش نمایش داده شود
         card.addView(HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = true
+            isFillViewport = true
             addView(table)
-        }, LinearLayout.LayoutParams(-1, dp(430)))
+        }, LinearLayout.LayoutParams(-1, -2))
         c.addView(card)
         c.addView(bottomNav(1))
         scroll.addView(c)
@@ -438,51 +443,71 @@ class MainActivity : Activity() {
         val ay = academicYear()
         val st = db.students()
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val pairs = PersianCalendar.academicMonths(startYear)
+        val selectedPair = PersianCalendar.academicMonths(startYear)[(selectedMonth - 1).coerceIn(0, 11)]
+        val monthName = months[(selectedMonth - 1).coerceIn(0, 11)]
         var paid = 0
         var received = 0L
-        st.forEach { s -> pairs.forEach { p -> if (db.payment(s.id, ay, p.first, p.second)?.paid == true) { paid++; received += s.fee } } }
-        val total = st.size * 12
+        st.forEach { s ->
+            if (db.payment(s.id, ay, selectedPair.first, selectedPair.second)?.paid == true) {
+                paid++
+                received += s.fee
+            }
+        }
+        val total = st.size
         val stats = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         statCard(stats, "✓", "پرداخت شده", paid.toString(), green)
         statCard(stats, "+", "پرداخت نشده", (total - paid).coerceAtLeast(0).toString(), red)
         statCard(stats, "₿", "دریافت شده", money(received), teal, "تومان")
-        statCard(stats, "▣", "مانده", money((st.sumOf { it.fee } * 12 - received).coerceAtLeast(0)), purple, "تومان")
+        statCard(stats, "▣", "مانده", money((st.sumOf { it.fee } - received).coerceAtLeast(0)), purple, "تومان")
         box.addView(stats, LinearLayout.LayoutParams(-1, dp(110)))
+        box.addView(text("گزارش ماه $monthName — سال تحصیلی $ay", 13f, navy, true).apply {
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(6), 0, 0) })
 
         val table = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = shape(Color.WHITE, 12, line) }
         val h = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        simpleCell(h, "نام دانش‌آموز", .40f, Color.WHITE, blue)
-        simpleCell(h, "مبلغ", .25f, Color.WHITE, blue)
-        simpleCell(h, "وضعیت", .35f, Color.WHITE, blue)
+        simpleCell(h, "نام دانش‌آموز", .30f, Color.WHITE, blue)
+        simpleCell(h, "مبلغ", .20f, Color.WHITE, blue)
+        simpleCell(h, "وضعیت", .25f, Color.WHITE, blue)
+        simpleCell(h, "تاریخ پرداخت", .25f, Color.WHITE, blue)
         table.addView(h)
-        val today = PersianCalendar.today()
         st.forEach { s ->
-            val pay = db.payment(s.id, ay, today.y, today.m)
+            val pay = db.payment(s.id, ay, selectedPair.first, selectedPair.second)
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            simpleCell(row, s.name, .40f)
-            simpleCell(row, money(s.fee), .25f)
-            simpleCell(row, if (pay?.paid == true) "پرداخت شده" else "پرداخت نشده", .35f, if (pay?.paid == true) green else red)
+            simpleCell(row, s.name, .30f)
+            simpleCell(row, money(s.fee), .20f)
+            simpleCell(row, if (pay?.paid == true) "پرداخت شده" else "پرداخت نشده", .25f, if (pay?.paid == true) green else red)
+            simpleCell(row, if (pay?.paid == true) (pay.date ?: "—") else "—", .25f)
             row.setOnClickListener { details(s) }
             table.addView(row)
         }
-        box.addView(table, LinearLayout.LayoutParams(-1, dp(360)).apply { setMargins(0, dp(10), 0, 0) })
-        box.addView(text("⇩  خروجی گزارش", 14f, blue, true).apply {
-            gravity = Gravity.CENTER
-            background = shape(Color.rgb(232, 244, 255), 12)
-        }, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, dp(10), 0, 0) })
+        // بدون ارتفاع ثابت تا همه دانش‌آموزان (تا ۶۰+) دیده شوند
+        box.addView(ScrollView(this).apply {
+            addView(table)
+        }, LinearLayout.LayoutParams(-1, dp(360)).apply { setMargins(0, dp(10), 0, 0) })
         AlertDialog.Builder(this).setTitle("گزارش ماهانه").setView(box).setPositiveButton("بستن", null).show()
     }
 
     private fun settings() {
         val items = arrayOf(
-            "اطلاعات برنامه\nنسخه 1.0.0",
+            "اطلاعات برنامه\nنسخه 1.2.0",
             "مدیریت سال تحصیلی\n" + academicYear(),
-            "تنظیمات نمایش\nزبان: فارسی | تم: روشن",
-            "درباره\nمدیریت سرویس مدرسه"
+            "تنظیمات نمایش\nزبان: فارسی | RTL",
+            "درباره برنامه"
         )
-        AlertDialog.Builder(this).setTitle("تنظیمات").setItems(items, null)
-            .setNegativeButton("خروج از برنامه") { _, _ -> finish() }.show()
+        AlertDialog.Builder(this).setTitle("تنظیمات").setItems(items) { _, i ->
+            if (i == 3) {
+                AlertDialog.Builder(this)
+                    .setTitle("درباره برنامه")
+                    .setMessage(
+                        "مدیریت سرویس مدرسه\nنسخه 1.2.0\n\n" +
+                        "طراح و برنامه نویس: محمدرضا ممی زاده\n" +
+                        "تلفن: 09144402453"
+                    )
+                    .setPositiveButton("بستن", null)
+                    .show()
+            }
+        }.setNegativeButton("خروج از برنامه") { _, _ -> finish() }.show()
     }
 
     private fun backupExport() {
