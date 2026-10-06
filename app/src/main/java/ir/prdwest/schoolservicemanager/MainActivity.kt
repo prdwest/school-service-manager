@@ -116,19 +116,25 @@ class MainActivity : Activity() {
         filters.addView(spinnerBox("ماه", nowMonth), LinearLayout.LayoutParams(0, dp(70), 1f).apply { setMargins(dp(5), 0, 0, 0) })
         c.addView(filters)
 
-        val stats = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val st = db.students()
         val ay = academicYear()
         val selectedPair = PersianCalendar.academicMonths(startYear)[(selectedMonth - 1).coerceIn(0, 11)]
-        var paid = 0
-        var received = 0L
-        st.forEach { s -> if (db.payment(s.id, ay, selectedPair.first, selectedPair.second)?.paid == true) { paid++; received += s.fee } }
+        val paid = db.monthPaidCount(ay, selectedPair.first, selectedPair.second)
+        val received = db.monthReceived(ay, selectedPair.first, selectedPair.second)
         val total = st.size
-        statCard(stats, "✓", "پرداخت شده", paid.toString() + " نفر", green)
-        statCard(stats, "+", "پرداخت نشده", (total - paid).coerceAtLeast(0).toString() + " نفر", red)
-        statCard(stats, "₿", "دریافت شده", money(received), teal, "تومان")
-        statCard(stats, "▣", "مانده", money((st.sumOf { it.fee } - received).coerceAtLeast(0)), purple, "تومان")
-        c.addView(stats, LinearLayout.LayoutParams(-1, dp(112)).apply { setMargins(0, dp(10), 0, 0) })
+        val unpaid = (total - paid).coerceAtLeast(0)
+        val monthDue = st.sumOf { it.fee }
+        val remain = (monthDue - received).coerceAtLeast(0)
+        val yearTotal = db.yearReceived(ay, startYear)
+        c.addView(statsPanel(
+            listOf(
+                StatItem("پرداخت‌شده", "$paid نفر", green),
+                StatItem("پرداخت‌نشده", "$unpaid نفر", red),
+                StatItem("دریافت ماه", money(received) + " تومان", teal),
+                StatItem("مانده ماه", money(remain) + " تومان", purple),
+                StatItem("دریافتی کل ماه‌ها", money(yearTotal) + " تومان", orange)
+            )
+        ), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(10), 0, 0) })
 
         val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         bigAction(row1, "🎓", "دانش‌آموزان", "مشاهده و مدیریت دانش‌آموزان", blue) { showStudents() }
@@ -191,17 +197,40 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun statCard(parent: LinearLayout, icon: String, title: String, value: String, color: Int, unit: String = "") {
-        val b = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = shape(Color.WHITE, 13, line)
+    private data class StatItem(val title: String, val value: String, val color: Int)
+
+    /** کارت‌های آمار قابل اسکرول افقی — بدون آیکون تا عدد کامل دیده شود */
+    private fun statsPanel(items: List<StatItem>): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(2), dp(2), dp(2), dp(2))
         }
-        b.addView(text(icon, 23f, color, true).apply { gravity = Gravity.CENTER })
-        b.addView(text(title, 10f, Color.DKGRAY, true).apply { gravity = Gravity.CENTER })
-        b.addView(text(value, 14f, color, true).apply { gravity = Gravity.CENTER })
-        if (unit.isNotEmpty()) b.addView(text(unit, 9f, Color.DKGRAY).apply { gravity = Gravity.CENTER })
-        parent.addView(b, LinearLayout.LayoutParams(0, -1, 1f).apply { setMargins(dp(3), 0, dp(3), 0) })
+        items.forEach { item ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                background = shape(Color.WHITE, 12, line)
+                setPadding(dp(10), dp(10), dp(10), dp(10))
+                minimumWidth = dp(120)
+            }
+            card.addView(text(item.title, 12f, Color.DKGRAY, true).apply {
+                gravity = Gravity.CENTER
+                maxLines = 2
+            })
+            card.addView(text(item.value, 15f, item.color, true).apply {
+                gravity = Gravity.CENTER
+                setSingleLine(false)
+                maxLines = 3
+            })
+            row.addView(card, LinearLayout.LayoutParams(dp(140), -2).apply {
+                setMargins(dp(4), dp(2), dp(4), dp(2))
+            })
+        }
+        return HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = true
+            isFillViewport = true
+            addView(row)
+        }
     }
 
     private fun bigAction(parent: LinearLayout, icon: String, title: String, sub: String, color: Int, click: () -> Unit) {
@@ -267,9 +296,10 @@ class MainActivity : Activity() {
 
     private fun tableHeader(): View {
         val r = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        cell(r, "ردیف", 55, blue, true)
-        cell(r, "نام دانش‌آموز", 145, blue, true)
-        cell(r, "شهریه", 100, blue, true)
+        cell(r, "ردیف", 50, blue, true)
+        cell(r, "نام دانش‌آموز", 130, blue, true)
+        cell(r, "شهریه", 90, blue, true)
+        cell(r, "حذف", 60, blue, true)
         months.forEach { cell(r, it, 70, blue, true) }
         return r
     }
@@ -286,9 +316,15 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(if (n % 2 == 0) Color.rgb(249, 251, 254) else Color.WHITE)
         }
-        cellLight(r, n.toString(), 55)
-        cellLight(r, s.name, 145, true)
-        cellLight(r, money(s.fee), 100)
+        cellLight(r, n.toString(), 50)
+        cellLight(r, s.name, 130, true)
+        cellLight(r, money(s.fee), 90)
+        val delBtn = text("حذف", 12f, Color.WHITE, true).apply {
+            gravity = Gravity.CENTER
+            background = shape(red, 7)
+            setOnClickListener { confirmDelete(s) }
+        }
+        r.addView(delBtn, LinearLayout.LayoutParams(dp(60), dp(46)).apply { setMargins(dp(1), dp(1), dp(1), dp(1)) })
         pairs.forEachIndexed { mi, p ->
             val pay = db.payment(s.id, ay, p.first, p.second)
             val ok = pay?.paid == true
@@ -407,7 +443,12 @@ class MainActivity : Activity() {
             t.addView(row)
         }
         box.addView(t)
-        AlertDialog.Builder(this).setTitle("جزئیات دانش‌آموز").setView(box).setPositiveButton("بستن", null).show()
+        AlertDialog.Builder(this)
+            .setTitle("جزئیات دانش‌آموز")
+            .setView(box)
+            .setPositiveButton("بستن", null)
+            .setNegativeButton("حذف دانش‌آموز") { _, _ -> confirmDelete(s) }
+            .show()
     }
 
     private fun tableHeader3(a: String, b: String, c: String): View {
@@ -445,52 +486,73 @@ class MainActivity : Activity() {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val selectedPair = PersianCalendar.academicMonths(startYear)[(selectedMonth - 1).coerceIn(0, 11)]
         val monthName = months[(selectedMonth - 1).coerceIn(0, 11)]
-        var paid = 0
-        var received = 0L
-        st.forEach { s ->
-            if (db.payment(s.id, ay, selectedPair.first, selectedPair.second)?.paid == true) {
-                paid++
-                received += s.fee
-            }
-        }
+        val paid = db.monthPaidCount(ay, selectedPair.first, selectedPair.second)
+        val received = db.monthReceived(ay, selectedPair.first, selectedPair.second)
         val total = st.size
-        val stats = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        statCard(stats, "✓", "پرداخت شده", paid.toString(), green)
-        statCard(stats, "+", "پرداخت نشده", (total - paid).coerceAtLeast(0).toString(), red)
-        statCard(stats, "₿", "دریافت شده", money(received), teal, "تومان")
-        statCard(stats, "▣", "مانده", money((st.sumOf { it.fee } - received).coerceAtLeast(0)), purple, "تومان")
-        box.addView(stats, LinearLayout.LayoutParams(-1, dp(110)))
+        val unpaid = (total - paid).coerceAtLeast(0)
+        val remain = (st.sumOf { it.fee } - received).coerceAtLeast(0)
+        val yearTotal = db.yearReceived(ay, startYear)
+        box.addView(statsPanel(
+            listOf(
+                StatItem("پرداخت‌شده", "$paid نفر", green),
+                StatItem("پرداخت‌نشده", "$unpaid نفر", red),
+                StatItem("دریافت ماه", money(received) + " تومان", teal),
+                StatItem("مانده ماه", money(remain) + " تومان", purple),
+                StatItem("دریافتی کل ماه‌ها", money(yearTotal) + " تومان", orange)
+            )
+        ), LinearLayout.LayoutParams(-1, -2))
         box.addView(text("گزارش ماه $monthName — سال تحصیلی $ay", 13f, navy, true).apply {
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(6), 0, 0) })
 
         val table = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = shape(Color.WHITE, 12, line) }
         val h = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        simpleCell(h, "نام دانش‌آموز", .30f, Color.WHITE, blue)
-        simpleCell(h, "مبلغ", .20f, Color.WHITE, blue)
-        simpleCell(h, "وضعیت", .25f, Color.WHITE, blue)
-        simpleCell(h, "تاریخ پرداخت", .25f, Color.WHITE, blue)
+        simpleCell(h, "نام دانش‌آموز", .28f, Color.WHITE, blue)
+        simpleCell(h, "مبلغ", .18f, Color.WHITE, blue)
+        simpleCell(h, "وضعیت", .22f, Color.WHITE, blue)
+        simpleCell(h, "تاریخ پرداخت", .20f, Color.WHITE, blue)
+        simpleCell(h, "حذف", .12f, Color.WHITE, blue)
         table.addView(h)
         st.forEach { s ->
             val pay = db.payment(s.id, ay, selectedPair.first, selectedPair.second)
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            simpleCell(row, s.name, .30f)
-            simpleCell(row, money(s.fee), .20f)
-            simpleCell(row, if (pay?.paid == true) "پرداخت شده" else "پرداخت نشده", .25f, if (pay?.paid == true) green else red)
-            simpleCell(row, if (pay?.paid == true) (pay.date ?: "—") else "—", .25f)
+            simpleCell(row, s.name, .28f)
+            simpleCell(row, money(s.fee), .18f)
+            simpleCell(row, if (pay?.paid == true) "پرداخت شده" else "پرداخت نشده", .22f, if (pay?.paid == true) green else red)
+            simpleCell(row, if (pay?.paid == true) (pay.date ?: "—") else "—", .20f)
+            val del = text("حذف", 11f, Color.WHITE, true).apply {
+                gravity = Gravity.CENTER
+                background = shape(red, 4)
+                setOnClickListener { confirmDelete(s) }
+            }
+            row.addView(del, LinearLayout.LayoutParams(0, dp(36), .12f).apply { setMargins(dp(1), dp(1), dp(1), dp(1)) })
             row.setOnClickListener { details(s) }
             table.addView(row)
         }
-        // بدون ارتفاع ثابت تا همه دانش‌آموزان (تا ۶۰+) دیده شوند
-        box.addView(ScrollView(this).apply {
-            addView(table)
+        box.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = true
+            addView(ScrollView(this@MainActivity).apply { addView(table) })
         }, LinearLayout.LayoutParams(-1, dp(360)).apply { setMargins(0, dp(10), 0, 0) })
         AlertDialog.Builder(this).setTitle("گزارش ماهانه").setView(box).setPositiveButton("بستن", null).show()
     }
 
+    private fun confirmDelete(s: Student) {
+        AlertDialog.Builder(this)
+            .setTitle("حذف دانش‌آموز")
+            .setMessage("«${s.name}» و تمام پرداخت‌های مرتبط برای همیشه حذف شود؟")
+            .setPositiveButton("حذف") { _, _ ->
+                db.deleteStudent(s.id)
+                autoBackup()
+                Toast.makeText(this, "دانش‌آموز حذف شد", Toast.LENGTH_SHORT).show()
+                (currentScreen ?: { showDashboard() }).invoke()
+            }
+            .setNegativeButton("انصراف", null)
+            .show()
+    }
+
     private fun settings() {
         val items = arrayOf(
-            "اطلاعات برنامه\nنسخه 1.2.0",
+            "اطلاعات برنامه\nنسخه 1.4.0",
             "مدیریت سال تحصیلی\n" + academicYear(),
             "تنظیمات نمایش\nزبان: فارسی | RTL",
             "درباره برنامه"
@@ -500,7 +562,7 @@ class MainActivity : Activity() {
                 AlertDialog.Builder(this)
                     .setTitle("درباره برنامه")
                     .setMessage(
-                        "مدیریت سرویس مدرسه\nنسخه 1.2.0\n\n" +
+                        "مدیریت سرویس مدرسه\nنسخه 1.4.0\n\n" +
                         "طراح و برنامه نویس: محمدرضا ممی زاده\n" +
                         "تلفن: 09144402453"
                     )

@@ -8,7 +8,32 @@ class DatabaseHelper(c:Context):SQLiteOpenHelper(c,"school_service.db",null,1){
  override fun onUpgrade(d:SQLiteDatabase,o:Int,n:Int){}
  fun students():List<Student>{val c=readableDatabase.rawQuery("SELECT id,name,fee FROM students ORDER BY name",null);val r=mutableListOf<Student>();while(c.moveToNext())r.add(Student(c.getLong(0),c.getString(1),c.getLong(2)));c.close();return r}
  fun addStudent(n:String,f:Long){val v=ContentValues();v.put("name",n);v.put("fee",f);writableDatabase.insert("students",null,v)}
+ fun deleteStudent(id:Long){
+  val d=writableDatabase
+  d.beginTransaction()
+  try{
+   d.delete("payments","student_id=?",arrayOf(id.toString()))
+   d.delete("students","id=?",arrayOf(id.toString()))
+   d.setTransactionSuccessful()
+  }finally{d.endTransaction()}
+ }
  fun payment(s:Long,a:String,y:Int,m:Int):Payment?{val c=readableDatabase.rawQuery("SELECT paid,date FROM payments WHERE student_id=? AND academic_year=? AND year=? AND month=?",arrayOf(s.toString(),a,y.toString(),m.toString()));val p=if(c.moveToFirst())Payment(c.getInt(0)==1,c.getString(1))else null;c.close();return p}
+ fun monthReceived(a:String,y:Int,m:Int):Long{
+  var sum=0L
+  students().forEach{s->if(payment(s.id,a,y,m)?.paid==true)sum+=s.fee}
+  return sum
+ }
+ fun yearReceived(a:String,start:Int):Long{
+  var sum=0L
+  val pairs=PersianCalendar.academicMonths(start)
+  students().forEach{s->pairs.forEach{p->if(payment(s.id,a,p.first,p.second)?.paid==true)sum+=s.fee}}
+  return sum
+ }
+ fun monthPaidCount(a:String,y:Int,m:Int):Int{
+  var n=0
+  students().forEach{s->if(payment(s.id,a,y,m)?.paid==true)n++}
+  return n
+ }
  fun setPaid(s:Long,a:String,y:Int,m:Int,paid:Boolean){val v=ContentValues();v.put("student_id",s);v.put("academic_year",a);v.put("year",y);v.put("month",m);v.put("paid",if(paid)1 else 0);if(paid)v.put("date",PersianCalendar.format(PersianCalendar.today()))else v.putNull("date");writableDatabase.insertWithOnConflict("payments",null,v,SQLiteDatabase.CONFLICT_REPLACE)}
  fun exportJson():String{val o=org.json.JSONObject();val a=org.json.JSONArray();students().forEach{s->val x=org.json.JSONObject();x.put("id",s.id);x.put("name",s.name);x.put("fee",s.fee);a.put(x)};o.put("students",a);val p=org.json.JSONArray();val c=readableDatabase.rawQuery("SELECT student_id,academic_year,year,month,paid,date FROM payments",null);while(c.moveToNext()){val x=org.json.JSONObject();x.put("student_id",c.getLong(0));x.put("academic_year",c.getString(1));x.put("year",c.getInt(2));x.put("month",c.getInt(3));x.put("paid",c.getInt(4));x.put("date",if(c.isNull(5))org.json.JSONObject.NULL else c.getString(5));p.put(x)};c.close();o.put("payments",p);return o.toString()}
  fun restoreJson(j:String){
