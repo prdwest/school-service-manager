@@ -135,7 +135,7 @@ class MainActivity : Activity() {
         val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         bigAction(row2, "☁", "پشتیبان‌گیری", "ذخیره اطلاعات برنامه", orange) { backupExport() }
         bigAction(row2, "↥", "بازیابی", "بارگذاری اطلاعات", purple) { restoreFile() }
-        c.addView(row2, LinearLayout.LayoutParams(-1, dp(108)).apply { setMargins(0, dp(8), 0, 0) })
+        c.addView(row2, LinearLayout.LayoutParams(-1, dp(88)).apply { setMargins(0, dp(8), 0, 0) })
 
         c.addView(actionCard("▥", "گزارش ماهانه", "مشاهده گزارش پرداخت‌ها", teal) { monthlyReport() }, LinearLayout.LayoutParams(-1, dp(90)).apply { setMargins(0, dp(8), 0, 0) })
 
@@ -155,7 +155,7 @@ class MainActivity : Activity() {
             background = shape(Color.WHITE, 12, line)
             setPadding(dp(6), dp(4), dp(6), dp(4))
             addView(text(title, 11f, Color.DKGRAY, true))
-            addView(text(value + "  ⌄", 13f, navy, true))
+            addView(text(value + "  •  غیرفعال", 13f, navy, true))
         }
     }
 
