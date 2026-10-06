@@ -157,7 +157,35 @@ class MainActivity : Activity() {
             setPadding(dp(6), dp(4), dp(6), dp(4))
             addView(text(title, 11f, Color.DKGRAY, true))
             addView(text(value + "  ⌄", 13f, navy, true))
-            setOnClickListener { if (title == "ماه") { AlertDialog.Builder(this@MainActivity).setTitle("انتخاب ماه").setSingleChoiceItems(months, selectedMonth - 1) { d, which -> selectedMonth = which + 1; d.dismiss(); showDashboard() }.setNegativeButton("انصراف", null).show() } else { val current = PersianCalendar.today(); val currentStart = if (current.m <= 6) current.y - 1 else current.y; val years = (currentStart - 5..currentStart + 1).map { y -> y.toString() + "-" + (y + 1) }.toTypedArray(); val selected = (startYear - (currentStart - 5)).coerceIn(0, years.lastIndex); AlertDialog.Builder(this@MainActivity).setTitle("انتخاب سال تحصیلی").setSingleChoiceItems(years, selected) { d, which -> startYear = currentStart - 5 + which; d.dismiss(); showDashboard() }.setNegativeButton("انصراف", null).show() } }
+            setOnClickListener {
+                if (title == "ماه") {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("انتخاب ماه")
+                        .setSingleChoiceItems(months.toTypedArray(), selectedMonth - 1) { dialog, which: Int ->
+                            selectedMonth = which + 1
+                            dialog.dismiss()
+                            showDashboard()
+                        }
+                        .setNegativeButton("انصراف", null)
+                        .show()
+                } else {
+                    val current = PersianCalendar.today()
+                    val currentStart = if (current.m <= 6) current.y - 1 else current.y
+                    val years = (currentStart - 5..currentStart + 1)
+                        .map { y -> y.toString() + "-" + (y + 1) }
+                        .toTypedArray()
+                    val selected = (startYear - (currentStart - 5)).coerceIn(0, years.lastIndex)
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("انتخاب سال تحصیلی")
+                        .setSingleChoiceItems(years, selected) { dialog, which: Int ->
+                            startYear = currentStart - 5 + which
+                            dialog.dismiss()
+                            showDashboard()
+                        }
+                        .setNegativeButton("انصراف", null)
+                        .show()
+                }
+            }
         }
     }
 
