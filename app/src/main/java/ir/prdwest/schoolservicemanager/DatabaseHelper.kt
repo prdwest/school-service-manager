@@ -8,6 +8,10 @@ class DatabaseHelper(c:Context):SQLiteOpenHelper(c,"school_service.db",null,1){
  override fun onUpgrade(d:SQLiteDatabase,o:Int,n:Int){}
  fun students():List<Student>{val c=readableDatabase.rawQuery("SELECT id,name,fee FROM students ORDER BY name",null);val r=mutableListOf<Student>();while(c.moveToNext())r.add(Student(c.getLong(0),c.getString(1),c.getLong(2)));c.close();return r}
  fun addStudent(n:String,f:Long){val v=ContentValues();v.put("name",n);v.put("fee",f);writableDatabase.insert("students",null,v)}
+ fun updateStudent(id:Long,n:String,f:Long){
+  val v=ContentValues();v.put("name",n);v.put("fee",f)
+  writableDatabase.update("students",v,"id=?",arrayOf(id.toString()))
+ }
  fun deleteStudent(id:Long){
   val d=writableDatabase
   d.beginTransaction()

@@ -299,8 +299,9 @@ class MainActivity : Activity() {
         cell(r, "ردیف", 50, blue, true)
         cell(r, "نام دانش‌آموز", 130, blue, true)
         cell(r, "شهریه", 90, blue, true)
-        cell(r, "حذف", 60, blue, true)
         months.forEach { cell(r, it, 70, blue, true) }
+        cell(r, "ویرایش", 70, blue, true)
+        cell(r, "حذف", 60, blue, true)
         return r
     }
 
@@ -319,12 +320,6 @@ class MainActivity : Activity() {
         cellLight(r, n.toString(), 50)
         cellLight(r, s.name, 130, true)
         cellLight(r, money(s.fee), 90)
-        val delBtn = text("حذف", 12f, Color.WHITE, true).apply {
-            gravity = Gravity.CENTER
-            background = shape(red, 7)
-            setOnClickListener { confirmDelete(s) }
-        }
-        r.addView(delBtn, LinearLayout.LayoutParams(dp(60), dp(46)).apply { setMargins(dp(1), dp(1), dp(1), dp(1)) })
         pairs.forEachIndexed { mi, p ->
             val pay = db.payment(s.id, ay, p.first, p.second)
             val ok = pay?.paid == true
@@ -348,6 +343,19 @@ class MainActivity : Activity() {
             }
             r.addView(v, LinearLayout.LayoutParams(dp(70), dp(46)).apply { setMargins(dp(1), dp(1), dp(1), dp(1)) })
         }
+        // ویرایش و حذف بعد از شهریور (انتهای ردیف)
+        val editBtn = text("ویرایش", 12f, Color.WHITE, true).apply {
+            gravity = Gravity.CENTER
+            background = shape(blue, 7)
+            setOnClickListener { editStudent(s) }
+        }
+        r.addView(editBtn, LinearLayout.LayoutParams(dp(70), dp(46)).apply { setMargins(dp(1), dp(1), dp(1), dp(1)) })
+        val delBtn = text("حذف", 12f, Color.WHITE, true).apply {
+            gravity = Gravity.CENTER
+            background = shape(red, 7)
+            setOnClickListener { confirmDelete(s) }
+        }
+        r.addView(delBtn, LinearLayout.LayoutParams(dp(60), dp(46)).apply { setMargins(dp(1), dp(1), dp(1), dp(1)) })
         r.setOnLongClickListener { details(s); true }
         return r
     }
@@ -536,6 +544,46 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this).setTitle("گزارش ماهانه").setView(box).setPositiveButton("بستن", null).show()
     }
 
+
+    private fun editStudent(s: Student) {
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(5), dp(5), dp(5), dp(5))
+        }
+        val name = EditText(this).apply {
+            setText(s.name)
+            textSize = 15f
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        val fee = EditText(this).apply {
+            setText(s.fee.toString())
+            inputType = InputType.TYPE_CLASS_NUMBER
+            textSize = 15f
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        form.addView(text("نام دانش‌آموز *", 13f, navy, true))
+        form.addView(name, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(3), 0, dp(8)) })
+        form.addView(text("مبلغ ماهانه (تومان) *", 13f, navy, true))
+        form.addView(fee, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(3), 0, dp(8)) })
+        AlertDialog.Builder(this)
+            .setTitle("ویرایش دانش‌آموز")
+            .setView(form)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val n = name.text.toString().trim()
+                if (n.isBlank()) {
+                    Toast.makeText(this, "نام را وارد کنید", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val f = fee.text.toString().replace(",", "").toLongOrNull() ?: 0L
+                db.updateStudent(s.id, n, f)
+                autoBackup()
+                Toast.makeText(this, "ویرایش ذخیره شد", Toast.LENGTH_SHORT).show()
+                (currentScreen ?: { showStudents() }).invoke()
+            }
+            .setNegativeButton("انصراف", null)
+            .show()
+    }
+
     private fun confirmDelete(s: Student) {
         AlertDialog.Builder(this)
             .setTitle("حذف دانش‌آموز")
@@ -552,7 +600,7 @@ class MainActivity : Activity() {
 
     private fun settings() {
         val items = arrayOf(
-            "اطلاعات برنامه\nنسخه 1.4.0",
+            "اطلاعات برنامه\nنسخه 1.4.1",
             "مدیریت سال تحصیلی\n" + academicYear(),
             "تنظیمات نمایش\nزبان: فارسی | RTL",
             "درباره برنامه"
@@ -562,7 +610,7 @@ class MainActivity : Activity() {
                 AlertDialog.Builder(this)
                     .setTitle("درباره برنامه")
                     .setMessage(
-                        "مدیریت سرویس مدرسه\nنسخه 1.4.0\n\n" +
+                        "مدیریت سرویس مدرسه\nنسخه 1.4.1\n\n" +
                         "طراح و برنامه نویس: محمدرضا ممی زاده\n" +
                         "تلفن: 09144402453"
                     )
